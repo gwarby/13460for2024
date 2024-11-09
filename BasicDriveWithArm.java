@@ -19,7 +19,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
-@TeleOp(name = "BasicDriveWithArm (Blocks to Java)")
+@TeleOp(name = "BasicDriveWithArm")
 public class BasicDriveWithArm extends LinearOpMode {
 
   IntegratingGyroscope gyro;
@@ -29,8 +29,9 @@ public class BasicDriveWithArm extends LinearOpMode {
   private DcMotor rearleft;
   private DcMotor frontleft;
   private DcMotor rearright;
+  private DcMotor armrotate;
   private DcMotor armraise;
-  private Servo armrotate;
+  private Servo grabber;
   private CRServo armextend;
 
   /**
@@ -42,23 +43,31 @@ public class BasicDriveWithArm extends LinearOpMode {
     rearleft = hardwareMap.get(DcMotor.class, "rearleft");
     frontleft = hardwareMap.get(DcMotor.class, "frontleft");
     rearright = hardwareMap.get(DcMotor.class, "rearright");
-    armraise = hardwareMap.get(DcMotor.class, "armraise");
-    armrotate = hardwareMap.get(Servo.class, "armrotate");
     armextend = hardwareMap.get(CRServo.class, "armextend");
+    armrotate = hardwareMap.get(DcMotor.class, "armrotate");
+    armraise = hardwareMap.get(DcMotor.class, "armraise");
+    grabber = hardwareMap.get(Servo.class, "grabber");
+    
+    ElapsedTime programTime = new ElapsedTime();
 
     // Put initialization blocks here.
+    rearleft.setDirection(DcMotorSimple.Direction.REVERSE);
     rearright.setDirection(DcMotorSimple.Direction.REVERSE);
-    frontleft.setDirection(DcMotorSimple.Direction.REVERSE);
+    armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     armraise.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    armrotate.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     armraise.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     
-    int raiseLimitTicks;
     int extendLimitTicks;
-    int rotateLimitPosition;
-    double rotateLimitFraction;
-    double extendLimitFraction;
+    int rotateLimitTicks;
+    boolean grabberOpen = true, cmdRotate, cmdRaise;
+    int rotatePosTicks = 0;
+    int raisePosTicks = 0;
+    double lastGrabbed = 0;
     
+    grabber.setPosition(0.25);
     
     /*@Override public void runOpMode() throws InterruptedException {
         // Get a reference to a Modern Robotics GyroSensor object. We use several interfaces
@@ -89,27 +98,58 @@ public class BasicDriveWithArm extends LinearOpMode {
     waitForStart();
     if (opModeIsActive()) {
       // Put run blocks here.
+      programTime.reset();
       while (opModeIsActive()) {
-        
+        cmdRotate = gamepad2.left_stick_y != 0;
+        cmdRaise = gamepad2.right_stick_y != 0;
+        boolean canGrab = (programTime.time() > (lastGrabbed + 0.1));
         // Put loop blocks here.
-        frontleft.setPower(gamepad1.right_stick_x + gamepad1.right_stick_y + -gamepad1.left_stick_x);
+        frontleft.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + -gamepad1.left_stick_x);
         frontright.setPower(gamepad1.right_stick_x + gamepad1.right_stick_y + gamepad1.left_stick_x);
-        rearleft.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + -gamepad1.left_stick_x);
+        rearleft.setPower(gamepad1.right_stick_x + gamepad1.right_stick_y + -gamepad1.left_stick_x);
         rearright.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + gamepad1.left_stick_x);
-        armraise.setPower(-gamepad2.right_stick_y);
-        armrotate.setPosition(armrotate.getPosition() + gamepad2.left_stick_y/100);
         armextend.setPower(gamepad2.right_trigger - gamepad2.left_trigger);
+        armraise.setPower(-gamepad2.right_stick_y);
+        if (cmdRotate) {
+          armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+          if (gamepad2.left_stick_y < 0) {
+            armrotate.setPower(gamepad2.left_stick_y * 0.1);
+          } else {
+            armrotate.setPower(gamepad2.left_stick_y * 0.55);
+          }
+          rotatePosTicks = armrotate.getCurrentPosition();
+        } else {
+          armrotate.setTargetPosition(rotatePosTicks);
+          armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          armrotate.setPower(0.6);
+        }
         
-        raiseLimitTicks = armraise.getCurrentPosition();
-        // TODO: refactor code:
-        //  1st: match config of robot motors & servos - build team was in flux
-        //  2nd: ticks are an int, but servo position is a double rep'ing fractional position
-        extendLimitFraction = armextend.getController().getServoPosition(armextend.getPortNumber());
-        rotateLimitFraction = armrotate.getPosition();
+        if (cmdRaise) {
+          armraise.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+          armraise.setPower(-gamepad2.right_stick_y);
+          raisePosTicks = armraise.getCurrentPosition();
+          telemetry.addData("Inside arm raise cmd loop, raise power", -gamepad2.right_stick_y);
+        } else {
+          armraise.setTargetPosition(raisePosTicks);
+          armraise.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          armraise.setPower(0.6);
+        }
         
-        telemetry.addData("armraise Ticks", raiseLimitTicks);
-        telemetry.addData("armrotate Position", rotateLimitFraction);
-        telemetry.addData("armextend Ticks", extendLimitFraction);
+        if (gamepad2.a && canGrab) {
+          if (grabberOpen) {
+            grabber.setPosition(0.0);
+            grabberOpen = false;
+          } else {
+            grabber.setPosition(0.35);
+            grabberOpen = true;
+          }
+          lastGrabbed = programTime.time();
+        }
+        
+        rotateLimitTicks = armrotate.getCurrentPosition();
+        telemetry.addData("armraise ticks", armraise.getCurrentPosition());
+        telemetry.addData("armrotate Ticks", rotateLimitTicks);
+        telemetry.addData("time", programTime.time());
         telemetry.update();
       }
     }
