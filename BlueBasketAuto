@@ -1,0 +1,71 @@
+package org.firstinspires.ftc.teamcode;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+
+@Autonomous(name = "BlueBasketAuto")
+public class BlueBasketAuto extends LinearOpMode 
+{
+  // keep this constant, even though it is duplicated in AutoCommon  
+  double DRIVE_POWER = 0.5;
+ 
+ /**
+   * This function is executed when this OpMode is selected & Init is pressed
+   */
+  @Override
+  public void runOpMode() 
+  {
+    ElapsedTime programTime = new ElapsedTime();
+    
+    AutoCommon lib = new AutoCommon(
+      hardwareMap);
+    
+    //lib.initAprilTag();
+      
+    //double distanceToWall = lib.getAprilTagDetection(13, "y");
+
+    while (!opModeIsActive() & !isStopRequested())
+    {
+      telemetry.addLine("Waiting for start");
+      //telemetry.addData("Distance to wall", distanceToWall);
+      telemetry.update();
+    }
+    lib.closeGrabber();
+    
+    // wait for user to press start on Driver Station
+    waitForStart();
+    programTime.reset();      
+      lib.setArmAngle(10, 0.5);
+      lib.drive(18, 0, 0, 0.6);
+      lib.setArmAngle(0, 0.5);
+      lib.openGrabber();
+    if (opModeIsActive()) {
+      /************************************************************************
+       * START / RUN OPMODE CODE:
+       *   -perform autonomous driving based on identified prop location
+       ************************************************************************/
+      //lib.drive(0, -2, 0, 0.4);
+      //distanceToWall = lib.getAprilTag_BlueRight();
+      //telemetry.addData("Distance to wall", distanceToWall);
+      //sleep(1000);
+      /*lib.drive(distanceToWall.ftcPose.y - 30, 0, 0, DRIVE_POWER);
+      lib.setArmHeightWait(42, 0.8);
+      lib.setArmAngleWait(90, 0.8);
+      lib.drive(4, 0, 0, 0.2);
+      lib.openGrabber();
+      lib.drive(-4, 0, 0, 0.2);
+      lib.setArmAngle(0, 0.8);
+      lib.setArmHeightWait(0, 0.5);
+      lib.drive(0, 48, 0, 0.6);
+      lib.drive(-8, 0, 0, 0.8); */
+
+      
+      telemetry.addLine("Opmode COMPLETE");
+      telemetry.update();
+      while (opModeIsActive()) {
+        sleep(100); // this opMode doesn't use the boilerplate loop pattern, if this changes, be sure to remove the sleep
+      }
+    }
+  }
+}
