@@ -113,7 +113,7 @@ public class BasicDriveWithArm extends LinearOpMode {
         if (cmdRotate) {
           armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
           if (gamepad2.left_stick_y < 0) {
-            armrotate.setPower(gamepad2.left_stick_y * 0.1);
+            armrotate.setPower(gamepad2.left_stick_y * 0.07);
           } else {
             armrotate.setPower(gamepad2.left_stick_y * 0.55);
           }
