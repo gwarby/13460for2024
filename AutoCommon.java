@@ -174,6 +174,11 @@ public class AutoCommon extends LinearOpMode {
     frontRightPower = frontRightDistance / maxDistance;
     rearLeftPower = rearLeftDistance / maxDistance;
     rearRightPower = rearRightDistance / maxDistance;
+
+    frontleft.setPower(frontLeftPower);
+    frontright.setPower(frontRightPower);
+    rearleft.setPower(rearLeftPower);
+    rearright.setPower(rearRightPower);
     
     while (frontright.isBusy()) {
       sleep(10);
@@ -315,7 +320,7 @@ public class AutoCommon extends LinearOpMode {
       int rotateTargetTicks = (int) (angle * 4);
       armrotate.setTargetPosition(rotateTargetTicks);
       armraise.setPower(power);
-      while (armraise.isBusy()) {
+      while (armrotate.isBusy()) {
           sleep(10);
       }
   }
