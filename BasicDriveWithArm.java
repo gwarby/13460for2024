@@ -94,8 +94,9 @@ public class BasicDriveWithArm extends LinearOpMode {
         telemetry.log().clear();
     */
     
-    // top softlimit - around 5000 ticks
-    // bottom softlimit - around 450 ticks
+    // top raise softlimit - around 5000 ticks
+    // top rotate softlimit - around 450 ticks
+    // bottom both soft limit - 0 ticks
     
     waitForStart();
     if (opModeIsActive()) {
