@@ -54,7 +54,6 @@ public class BasicDriveWithArm extends LinearOpMode {
     rearleft.setDirection(DcMotorSimple.Direction.REVERSE);
     rearright.setDirection(DcMotorSimple.Direction.REVERSE);
     armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     armraise.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     armrotate.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -62,10 +61,10 @@ public class BasicDriveWithArm extends LinearOpMode {
     
     int extendLimitTicks;
     int rotateLimitTicks;
-    boolean grabberOpen = true, cmdRotate, cmdRaise;
+    boolean grabberOpen = true, armUp = false, cmdRaise;
     int rotatePosTicks = 0;
     int raisePosTicks = 0;
-    double lastGrabbed = 0;
+    double lastGrabbed = 0, lastRot = 0;
     
     grabber.setPosition(0.25);
     
@@ -95,14 +94,19 @@ public class BasicDriveWithArm extends LinearOpMode {
         telemetry.log().clear();
     */
     
+    // top softlimit - around 5000 ticks
+    // bottom softlimit - around 450 ticks
+    
     waitForStart();
     if (opModeIsActive()) {
       // Put run blocks here.
       programTime.reset();
       while (opModeIsActive()) {
-        cmdRotate = gamepad2.left_stick_y != 0;
         cmdRaise = gamepad2.right_stick_y != 0;
-        boolean canGrab = (programTime.time() > (lastGrabbed + 0.1));
+        boolean canGrab = (programTime.time() > (lastGrabbed + 0.4));
+        boolean canRot = (programTime.time() > (lastRot + 0.3));
+        telemetry.addData("can rotate", canRot);
+        telemetry.addData("gamepad2 b", gamepad2.b);
         // Put loop blocks here.
         frontleft.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + -gamepad1.left_stick_x);
         frontright.setPower(gamepad1.right_stick_x + gamepad1.right_stick_y + gamepad1.left_stick_x);
@@ -110,19 +114,50 @@ public class BasicDriveWithArm extends LinearOpMode {
         rearright.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + gamepad1.left_stick_x);
         armextend.setPower(gamepad2.right_trigger - gamepad2.left_trigger);
         armraise.setPower(-gamepad2.right_stick_y);
-        if (cmdRotate) {
-          armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        
+        
+        // if the dpad_down is held, slow the rotation
+        if (gamepad2.dpad_down){
           if (gamepad2.left_stick_y < 0) {
-            armrotate.setPower(gamepad2.left_stick_y * 0.07);
+            armrotate.setPower(-gamepad2.left_stick_y * 0.02); // set the power at an extremely low positive value to allow gravity to let it fall
           } else {
-            armrotate.setPower(gamepad2.left_stick_y * 0.55);
+            armrotate.setPower(-gamepad2.left_stick_y * 0.1);
           }
-          rotatePosTicks = armrotate.getCurrentPosition();
+          
         } else {
-          armrotate.setTargetPosition(rotatePosTicks);
-          armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-          armrotate.setPower(0.6);
+          if (gamepad2.left_stick_y < 0) {
+            armrotate.setPower(-gamepad2.left_stick_y * 0.005);
+          } else {
+            armrotate.setPower(-gamepad2.left_stick_y * 0.9);
+          }
         }
+        
+        // gamepad b puts the arm at either a slightly higher than middle posistion, or the bottom position
+        if (gamepad2.b && canRot) {
+          telemetry.addData("gamepad2.b Pressed", "True");
+          armrotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    
+        if (armUp) {
+            armrotate.setTargetPosition(0);
+            armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            armrotate.setPower(0.4);
+            armUp = false;
+        } else {
+            armrotate.setTargetPosition(470);
+            armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            armrotate.setPower(0.6);
+            armUp = true;
+        }
+    
+    lastRot = programTime.time();
+    telemetry.addData("armUp Toggled", armUp);
+    telemetry.update();
+}
+
+        telemetry.addData("arm rot target", armrotate.getTargetPosition());
+        
+        //armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        //armrotate.setPower(gamepad2.left_stick_y);
         
         if (cmdRaise) {
           armraise.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -135,6 +170,7 @@ public class BasicDriveWithArm extends LinearOpMode {
           armraise.setPower(0.6);
         }
         
+        // gamepad a opens and closes the grabber
         if (gamepad2.a && canGrab) {
           if (grabberOpen) {
             grabber.setPosition(0.0);
