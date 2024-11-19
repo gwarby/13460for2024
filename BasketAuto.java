@@ -46,11 +46,17 @@ public class BasketAuto extends LinearOpMode
       List<Integer> IdArray = lib.getCurrentAprilTagIds();  // Check to see if we see any april tags
       if (!IdArray.isEmpty()) {                     // If we do, enter conditional
         int mainTagId = IdArray.get(0);                 // Set the first (should be only) id to be our main id
+        double distanceFromWall;
         telemetry.addData("April tag found", mainTagId);
         if (mainTagId == null) {
-          telemetry.addLine("April tag not found, no data to return");
+          for (int i = 0; i < 100; i++) {
+            if (lib.getCurrentAprilTagIds[0] != null) {
+              distanceFromWall = lib.getCurrentAprilTagIds.ftcPose.y;
+              i == 100;
+            }
+            sleep(10);
         } else {
-          double distanceFromWall = lib.getAprilTagDetection(mainTagId).ftcPose.y;  // set our distance from the wall to a new variable
+          distanceFromWall = lib.getAprilTagDetection(mainTagId).ftcPose.y;  // set our distance from the wall to a new variable
           telemetry.addData("Distance from wall: " distanceFromWall);
         }
         lib.setArmHeight(43, 1);                    // raise the arm up
