@@ -1,6 +1,7 @@
 // Get package/imports
 package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.IMU;
@@ -18,6 +19,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
 // Begin code
 public class AutoCommon extends LinearOpMode {
@@ -64,9 +66,20 @@ public class AutoCommon extends LinearOpMode {
     frontright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    //armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    //armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     
+    armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    armrotate.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
+    armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    armraise.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
+    armrotate.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+    armraise.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+    
+    /*
+    PIDFCoefficients pidfOrig = armraise.getPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION);
+    PIDFCoefficients pidfNew = new PIDFCoefficients(2.5, 0.1, 0.2, 0.5);
+    armraise.setPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION, pidfNew); */
   }
   
   //private void sleep(int ms) { LinearOpMode.sleep(ms); }
@@ -109,6 +122,7 @@ public class AutoCommon extends LinearOpMode {
     double frontLeftPower, frontRightPower, rearLeftPower, rearRightPower;
     double maxDistance, frontLeftIMU = 0, frontRightIMU = 0, rearLeftIMU = 0, rearRightIMU = 0;
     double driveAngle = 0.0, currentPositionTicks, maxPower = 0.5;
+    /*
     boolean useNormCalc, holdAngle = false;
     int driveMagnitudeLevel = 0;  // 1: short distance, 2: medium distance, 3: long distance
     if (cw_ccw == 0) {      // if there is no commanded rotation, then IMU could be used to hold heading at start of drive cmd
@@ -136,23 +150,23 @@ public class AutoCommon extends LinearOpMode {
         maxPower = 0.35;
         driveMagnitudeLevel = 1;  // medium (rotation version)
       }
-    }
+    } */
     // Reset encoders
     frontleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     frontright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     // Multiply inputs (inches) by conversion factor (inches to ticks) to get rough target position (ticks)
-    fwd_bck = fwd_bck * 54.35714;
-    right_left = right_left * 57.04;
-    cw_ccw = cw_ccw * 12.85;
+    fwd_bck = fwd_bck * 54.2784576;
+    right_left = right_left * 58.04;
+    cw_ccw = cw_ccw * 13.217;
     // Calculate motor distances by adding/subtracting different inputs
-    frontLeftDistance = -fwd_bck + right_left -cw_ccw;
+    frontLeftDistance = -fwd_bck - right_left -cw_ccw;
     frontRightDistance = -fwd_bck + right_left + cw_ccw;
-    rearLeftDistance = -fwd_bck -right_left -cw_ccw;
+    rearLeftDistance = -fwd_bck + right_left -cw_ccw;
     rearRightDistance = -fwd_bck - right_left + cw_ccw;
     
-    useNormCalc = (Math.abs(frontLeftDistance) > 2880);
+    //useNormCalc = (Math.abs(frontLeftDistance) > 2880);
     
     // Find the max distance a motor is going
     maxDistance = JavaUtil.maxOfList(JavaUtil.createListWith(frontLeftDistance, frontRightDistance, rearLeftDistance, rearRightDistance));
@@ -174,7 +188,7 @@ public class AutoCommon extends LinearOpMode {
     frontRightPower = frontRightDistance / maxDistance;
     rearLeftPower = rearLeftDistance / maxDistance;
     rearRightPower = rearRightDistance / maxDistance;
-
+    
     frontleft.setPower(frontLeftPower);
     frontright.setPower(frontRightPower);
     rearleft.setPower(rearLeftPower);
@@ -296,37 +310,45 @@ public class AutoCommon extends LinearOpMode {
    * Raise the arm to a set height in inches by converting from ticks
    */
   public void setArmHeight(double height, double power) {
-    int raiseTargetTicks = (int) (height * 125.6);
+    int raiseTargetTicks = (int) (height * 116.6);
     armraise.setTargetPosition(raiseTargetTicks);
+    armraise.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     armraise.setPower(power);
+    armraise.setPower(1);
+    while (armraise.isBusy()) {
+      sleep(10);
+    }
   }
   
   public void setArmHeightWait(double height, double power) {
-    int raiseTargetTicks = (int) (height * 125.6);
+    int raiseTargetTicks = (int) (height * 116.6);
     armraise.setTargetPosition(raiseTargetTicks);
     armraise.setPower(power);
+    armraise.setMode(DcMotor.RunMode.RUN_TO_POSITION);
     while (armraise.isBusy()) {
       sleep(10);
     }
   }
 
   public void setArmAngle(double angle, double power) {
-      int rotateTargetTicks = (int) (angle * 4);
+      int rotateTargetTicks = (int) (angle * 4.55);
       armrotate.setTargetPosition(rotateTargetTicks);
-      armraise.setPower(power);
+      armrotate.setPower(power);
+      armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
   }
 
   public void setArmAngleWait(double angle, double power) {
-      int rotateTargetTicks = (int) (angle * 4);
+      int rotateTargetTicks = (int) (angle * 4.55);
       armrotate.setTargetPosition(rotateTargetTicks);
-      armraise.setPower(power);
+      armrotate.setPower(power);
+      armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
       while (armrotate.isBusy()) {
           sleep(10);
       }
   }
   
   public void openGrabber() {
-    grabber.setPosition(0.25);
+    grabber.setPosition(0.35);
   }
   
   public void closeGrabber() {
@@ -351,45 +373,29 @@ public class AutoCommon extends LinearOpMode {
    * Initialize the AprilTag processor.
    */
   public void initAprilTag() {
-  
-      // Create the AprilTag processor.
-      AprilTagProcessor.Builder atpBuilder = new AprilTagProcessor.Builder();
-      // lots of options could be overriden here, such as:
-      // aprilTag.setLensIntrinsics(578.272, 578.272, 402.145, 221.506)
-      aprilTag = atpBuilder.build();
+    
 
-      // Adjust Image Decimation to trade-off detection-range for detection-rate.
-      // eg: Some typical detection data using a Logitech C920 WebCam
-      // Decimation = 1 ..  Detect 2" Tag from 10 feet away at 10 Frames per second
-      // Decimation = 2 ..  Detect 2" Tag from 6  feet away at 22 Frames per second
-      // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second (default)
-      // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second (default)
-      // Note: Decimation can be changed on-the-fly to adapt during a match.
-      //aprilTag.setDecimation(3);
-  
-      // Create the vision portal by using a builder.
-      VisionPortal.Builder builder = new VisionPortal.Builder();
-      builder.setCamera(hardwareMap.get(WebcamName.class, "Webcam"));
+        // Create the AprilTag processor.
+        aprilTag = new AprilTagProcessor.Builder().setTagLibrary(AprilTagGameDatabase
+        .getIntoTheDeepTagLibrary())
+        .build();
 
-      // Choose a camera resolution. Not all cameras support all resolutions.
-      //builder.setCameraResolution(new Size(544, 288));
-  
-      // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
-      builder.enableLiveView(false);  // this will be used in the middle of our opmodes, so preview won't be possible anyway
-  
-      // Set the stream format; MJPEG uses less bandwidth than default YUY2.
-      //builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
-  
-      // Set and enable the processor.
-      builder.addProcessor(aprilTag);
-  
-      // Build the Vision Portal, using the above settings.
-      visionPortal = builder.build();
-  
-      // Disable or re-enable the aprilTag processor at any time.
-      //visionPortal.setProcessorEnabled(aprilTag, true);
-  
-  }   // end method initAprilTag()
+        // Create the vision portal by using a builder.
+        VisionPortal.Builder builder = new VisionPortal.Builder();
+
+        // Set the camera (webcam vs. built-in RC phone camera).
+        builder.setCamera(hardwareMap.get(WebcamName.class, "Webcam"));
+
+        // Set and enable the processor.
+        builder.addProcessor(aprilTag);
+
+        // Build the Vision Portal, using the above settings.
+        visionPortal = builder.build();
+
+        // Disable or re-enable the aprilTag processor at any time.
+        //visionPortal.setProcessorEnabled(aprilTag, true);
+
+    }   // end method initAprilTag()
 
   /*********************************************************************
    * getAprilTagDetection(tagID)
@@ -428,10 +434,10 @@ public class AutoCommon extends LinearOpMode {
    *          
    *********************************************************************/
   public AprilTagDetection getAprilTagDetection(int requestId) {
+    
     List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-
     for (AprilTagDetection detection : currentDetections) {  // Step through the list of detections and look for the requested id
-      if (detection.id == requestId) {
+      if (detection.id == requestId && detection.metadata != null) {
         return detection;
       }
     }   // end for() loop
