@@ -62,10 +62,10 @@ public class BasicDriveWithArm extends LinearOpMode {
     
     int extendLimitTicks;
     int rotateLimitTicks;
-    boolean grabberOpen = true, cmdRotate, cmdRaise;
+    boolean grabberOpen = true, armUp = false, cmdRaise;
     int rotatePosTicks = 0;
     int raisePosTicks = 0;
-    double lastGrabbed = 0;
+    double lastGrabbed = 0, lastRot = 0;
     
     grabber.setPosition(0.25);
     
@@ -100,9 +100,9 @@ public class BasicDriveWithArm extends LinearOpMode {
       // Put run blocks here.
       programTime.reset();
       while (opModeIsActive()) {
-        cmdRotate = gamepad2.left_stick_y != 0;
-        cmdRaise = gamepad2.right_stick_y != 0;
-        boolean canGrab = (programTime.time() > (lastGrabbed + 0.1));
+        boolean canRotate = (programTime.time() > (lastRot + 0.25));
+        cmdRaise = gamepad2.left_stick_y != 0;
+        boolean canGrab = (programTime.time() > (lastGrabbed + 0.25));
         // Put loop blocks here.
         frontleft.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + -gamepad1.left_stick_x);
         frontright.setPower(gamepad1.right_stick_x + gamepad1.right_stick_y + gamepad1.left_stick_x);
@@ -110,7 +110,7 @@ public class BasicDriveWithArm extends LinearOpMode {
         rearright.setPower(-gamepad1.right_stick_x + gamepad1.right_stick_y + gamepad1.left_stick_x);
         armextend.setPower(gamepad2.right_trigger - gamepad2.left_trigger);
         armraise.setPower(-gamepad2.right_stick_y);
-        if (cmdRotate) {
+        /*if (cmdRotate) {
           armrotate.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
           if (gamepad2.left_stick_y < 0) {
             armrotate.setPower(gamepad2.left_stick_y * 0.07);
@@ -122,11 +122,29 @@ public class BasicDriveWithArm extends LinearOpMode {
           armrotate.setTargetPosition(rotatePosTicks);
           armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
           armrotate.setPower(0.6);
+        }*/
+        
+        if (gamepad2.b && canRotate) {
+          if (armUp) {
+            armrotate.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
+            armrotate.setTargetPosition(0);
+            armrotate.setPower(0.6);
+            armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            armUp = false;
+            
+          } else {
+            armrotate.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
+            armrotate.setTargetPosition(410);
+            armrotate.setPower(0.6);
+            armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            armUp = true;
+          }
+          lastRot = programTime.time();
         }
         
         if (cmdRaise) {
           armraise.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-          armraise.setPower(-gamepad2.right_stick_y);
+          armraise.setPower(-gamepad2.left_stick_y);
           raisePosTicks = armraise.getCurrentPosition();
           telemetry.addData("Inside arm raise cmd loop, raise power", -gamepad2.right_stick_y);
         } else {
