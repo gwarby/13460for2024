@@ -1,6 +1,13 @@
 // Get package/imports
 package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.TouchSensor;
+import com.qualcomm.robotcore.hardware.IntegratingGyroscope;
+import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import com.qualcomm.hardware.kauailabs.NavxMicroNavigationSensor;
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -20,6 +27,8 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.hardware.TouchSensor;
+
 
 // Begin code
 public class AutoCommon extends LinearOpMode {
@@ -31,11 +40,15 @@ public class AutoCommon extends LinearOpMode {
   private VisionPortal visionPortal;
   
   private IMU imu;
+  IntegratingGyroscope gyro;
+  NavxMicroNavigationSensor navxMicro;
 
   // Declare motors/servos
-  private DcMotor frontleft, rearleft, frontright, rearright, armraise, armrotate;
-  private Servo grabber, armlimiter;
-  private CRServo armextend;
+  private DcMotor frontleft, rearleft, frontright, rearright, armrotate;
+  private DcMotorEx armraiseEx, armraiseBEx;
+  private Servo armlimiter;
+  private CRServo armextend, grabber;
+  private TouchSensor magSwitch;
 
   // This class isn't an opmode that should be run on the robot
   // but it extends (inherits from) LinearOpMode so it can access
@@ -51,35 +64,32 @@ public class AutoCommon extends LinearOpMode {
     rearleft = hardwareMap.get(DcMotor.class, "rearleft");
     frontright = hardwareMap.get(DcMotor.class, "frontright");
     rearright = hardwareMap.get(DcMotor.class, "rearright");
-    armraise = hardwareMap.get(DcMotor.class, "armraise");
+    armraiseEx = hardwareMap.get(DcMotorEx.class, "armraiseM");
+    armraiseBEx = hardwareMap.get(DcMotorEx.class, "armraiseB");
     armrotate = hardwareMap.get(DcMotor.class, "armrotate");
     armextend = hardwareMap.get(CRServo.class, "armextend");
-    grabber = hardwareMap.get(Servo.class, "grabber");
+    grabber = hardwareMap.get(CRServo.class, "grabber");
+    magSwitch = hardwareMap.get(TouchSensor.class, "magSwitch");
     
     imu = hardwareMap.get(IMU.class, "imu");  // Retrieve the IMU from the hardware map
-    imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.LEFT,RevHubOrientationOnRobot.UsbFacingDirection.FORWARD)));
+    imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.BACKWARD,RevHubOrientationOnRobot.UsbFacingDirection.LEFT)));
     
-    rearleft.setDirection(DcMotorSimple.Direction.REVERSE);
-    rearright.setDirection(DcMotorSimple.Direction.REVERSE);
+    frontleft.setDirection(DcMotorSimple.Direction.REVERSE);
+    frontright.setDirection(DcMotorSimple.Direction.REVERSE);
     
     frontleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     frontright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    //armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    //armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     
+    armraiseEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    armraiseBEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    armrotate.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
-    armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    armraise.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
-    armrotate.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-    armraise.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     
     /*
-    PIDFCoefficients pidfOrig = armraise.getPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION);
+    PIDFCoefficients pidfOrig = armraiseEx.getPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION);
     PIDFCoefficients pidfNew = new PIDFCoefficients(2.5, 0.1, 0.2, 0.5);
-    armraise.setPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION, pidfNew); */
+    armraiseEx.setPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION, pidfNew); */
   }
   
   //private void sleep(int ms) { LinearOpMode.sleep(ms); }
@@ -95,11 +105,29 @@ public class AutoCommon extends LinearOpMode {
     imu.resetYaw();
   }
   
+  public void initGyro() {
+    navxMicro = hardwareMap.get(NavxMicroNavigationSensor.class, "godIMU");
+    gyro = (IntegratingGyroscope) navxMicro;
+    while (navxMicro.isCalibrating()) {
+      sleep(10);
+    }
+  }
+  
   public void imuReInit() {
     imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.LEFT,RevHubOrientationOnRobot.UsbFacingDirection.UP)));
   }
+  
+  public double getImuYaw() {
+    AngularVelocity rates = gyro.getAngularVelocity(AngleUnit.DEGREES);
+    Orientation angles = gyro.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
+    return (double) AngleUnit.DEGREES.normalize(AngleUnit.DEGREES.fromUnit(angles.angleUnit, angles.firstAngle));
+  }
 
- 
+ public void resetArmEncoders() {
+   armraiseEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+   armraiseBEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+   armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+ }
 
   public double LastDrivePower = 0.0;
   public int WhileLoopId = -1;
@@ -113,49 +141,11 @@ public class AutoCommon extends LinearOpMode {
     frontright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     rearright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    Count1 = 0; 
-    Count2 = 0; 
-    Count3 = 0;
-    Count4 = 0;
     // Declare variables to be used later
     double frontLeftDistance, rearLeftDistance, frontRightDistance, rearRightDistance;
     double frontLeftPower, frontRightPower, rearLeftPower, rearRightPower;
-    double maxDistance, frontLeftIMU = 0, frontRightIMU = 0, rearLeftIMU = 0, rearRightIMU = 0;
-    double driveAngle = 0.0, currentPositionTicks, maxPower = 0.5;
-    /*
-    boolean useNormCalc, holdAngle = false;
-    int driveMagnitudeLevel = 0;  // 1: short distance, 2: medium distance, 3: long distance
-    if (cw_ccw == 0) {      // if there is no commanded rotation, then IMU could be used to hold heading at start of drive cmd
-      adjustEncoderTolerance(9);
-      holdAngle = true;     // bool denoting we are trying to hold yaw angle
-      driveAngle = getImuYaw();   // snapshot of IMU yaw reading at beginning of drive cmd
-      double totalDistance = Math.sqrt(Math.pow(fwd_bck, 2) + Math.pow(right_left, 2));   // dist calc for "diagonal" of fwd_bck & right_left
-      if (totalDistance <= 7) {
-        maxPower = 0.3;
-        driveMagnitudeLevel = 1;  // short
-      } else if (totalDistance > 7 && totalDistance < 36) {
-        maxPower = 0.55;
-        driveMagnitudeLevel = 2;  // medium
-      } else {
-        maxPower = 0.9;
-        driveMagnitudeLevel = 3;  // long
-      }
-    } else {  // Rotation is part (or likely all) of the drive cmd
-      holdAngle = false;
-      adjustEncoderTolerance(4);
-      if (cw_ccw > 45) {
-        maxPower = 0.55;
-        driveMagnitudeLevel = 2;  // short (rotation version)
-      } else {
-        maxPower = 0.35;
-        driveMagnitudeLevel = 1;  // medium (rotation version)
-      }
-    } */
-    // Reset encoders
-    frontleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    frontright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    rearleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    rearright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    double maxDistance;
+    
     // Multiply inputs (inches) by conversion factor (inches to ticks) to get rough target position (ticks)
     fwd_bck = fwd_bck * 54.2784576;
     right_left = right_left * 58.04;
@@ -165,188 +155,151 @@ public class AutoCommon extends LinearOpMode {
     frontRightDistance = -fwd_bck + right_left + cw_ccw;
     rearLeftDistance = -fwd_bck + right_left -cw_ccw;
     rearRightDistance = -fwd_bck - right_left + cw_ccw;
-    
-    //useNormCalc = (Math.abs(frontLeftDistance) > 2880);
-    
     // Find the max distance a motor is going
     maxDistance = JavaUtil.maxOfList(JavaUtil.createListWith(frontLeftDistance, frontRightDistance, rearLeftDistance, rearRightDistance));
     // Set the power proportionate to the distance the motor has to travel relative to the others
     // This will ensure all wheels arrive at their target position at/near the same time, avoiding draggin
     // Set target position to the previously calculated distance
-    frontleft.setTargetPosition((int) frontLeftDistance);
-    frontright.setTargetPosition((int) frontRightDistance);
-    rearleft.setTargetPosition((int) rearLeftDistance);
-    rearright.setTargetPosition((int) rearRightDistance);
+    int frontleftTargetPosition = (int) frontLeftDistance;
+    int frontrightTargetPosition = (int) frontRightDistance;
+    int rearleftTargetPosition = (int) rearLeftDistance;
+    int rearrightTargetPosition = (int) rearRightDistance;
+    
+    frontleft.setTargetPosition(frontleftTargetPosition);
+    frontright.setTargetPosition(frontrightTargetPosition);
+    rearleft.setTargetPosition(rearleftTargetPosition);
+    rearright.setTargetPosition(rearrightTargetPosition);
     
     frontleft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
     frontright.setMode(DcMotor.RunMode.RUN_TO_POSITION);
     rearleft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
     rearright.setMode(DcMotor.RunMode.RUN_TO_POSITION);
     
-    
-    frontLeftPower = frontLeftDistance / maxDistance;
-    frontRightPower = frontRightDistance / maxDistance;
-    rearLeftPower = rearLeftDistance / maxDistance;
-    rearRightPower = rearRightDistance / maxDistance;
+    frontLeftPower = power * frontLeftDistance / maxDistance;
+    frontRightPower = power * frontRightDistance / maxDistance;
+    rearLeftPower = power * rearLeftDistance / maxDistance;
+    rearRightPower = power * rearRightDistance / maxDistance;
     
     frontleft.setPower(frontLeftPower);
     frontright.setPower(frontRightPower);
     rearleft.setPower(rearLeftPower);
     rearright.setPower(rearRightPower);
-    
+  }
+  
+  public void driveRaiseArm(double fwd, double lr, double turn, double power) {
+    drive(fwd, lr, turn, power);
+    raiseArm();
+    while (frontright.isBusy() || armraiseEx.isBusy()) {
+      sleep(10);
+    }
+  }
+  
+  public void driveLowerArm(double fwd, double lr, double turn, double power) {
+    drive(fwd, lr, turn, power);
+    lowerArmWait();
+    while (frontright.isBusy() || armraiseEx.isBusy()) {
+      sleep(10);
+    }
+  }
+  
+  public void driveWait(double fwd, double lr, double turn, double power) {
+    drive(fwd, lr, turn, power);
     while (frontright.isBusy()) {
+      sleep(15);
+    }
+  }
+  
+  public void raiseArm() {
+    armraiseEx.setTargetPosition(4400);
+    armraiseBEx.setTargetPosition(-4400);
+    armrotate.setTargetPosition(-5500);
+    armrotate.setPower(1);
+    armraiseEx.setPower(0.95);
+    armraiseBEx.setPower(0.95);
+    armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    armraiseEx.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    armraiseBEx.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    while (armraiseEx.isBusy()) {
       sleep(10);
+    }
+  }
+  
+  public void driveWaitDrive(double deltaZ) {
+    lowerArm();
+    driveWait(-16, 17, 0, 0.7);
+    driveWait(0, 0, getImuYaw() - deltaZ, 0.5);
+    drive(-3, 15.5, 0, 0.7);
+    while (!(Math.abs(armrotate.getCurrentPosition()) < 200 && Math.abs(armrotate.getCurrentPosition() - 100) < 300)) {
+      if (magSwitch.isPressed()) {
+        armraiseEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        armraiseBEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+      }
+    }
+  }
+  
+  public void lowerArmWait() {
+    armrotate.setTargetPosition(0);
+    armraiseEx.setTargetPosition(0);
+    armraiseBEx.setTargetPosition(0);
+    armrotate.setPower(0.8);
+    armraiseEx.setPower(0.95);
+    armraiseBEx.setPower(0.95);
+    armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    armraiseEx.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    armraiseBEx.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    while (!(Math.abs(armrotate.getCurrentPosition()) < 200 && Math.abs(armrotate.getCurrentPosition() - 100) < 300)) {
+      if (magSwitch.isPressed()) {
+        armraiseEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        armraiseBEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+      }
     }
     
-    /*
-    // Set the motors to run to position
-    // Calculate distance milestones for (possible) power modulation
-    double firstQuarter = Math.abs(frontLeftDistance / 4);
-    double firstEighth = firstQuarter / 2;
-    double lastQuarter = 3 * firstQuarter;
-    double lastEighth = firstEighth * 7;
-    frontleft.setPower(0.3);
-    frontright.setPower(0.3);
-    rearleft.setPower(0.3);
-    rearright.setPower(0.3);
-    
-    if (driveMagnitudeLevel == 1 || driveMagnitudeLevel == 2) { //(maxPower == 0.3 || maxPower == 0.7) {   // SHORT, MEDIUM DRIVES & ROTATIONS
-      while (frontleft.isBusy()) {
-        frontleft.setPower(maxPower * frontLeftPower);
-        frontright.setPower(maxPower * frontRightPower);
-        rearleft.setPower(maxPower * rearLeftPower);
-        rearright.setPower(maxPower * rearRightPower);
-        WhileLoopId = 1; }
-        
-    } else { //if (cw_ccw == 0.0) {  // LONG DRIVES W/O ROTATION
-      while (frontleft.isBusy()) {
-        currentPositionTicks = Math.abs(frontleft.getCurrentPosition());    // Only call .getCurrentPosition() once per cycle, instead of five
-
-        
-        // Ramp smoothly over 1st & last quarter of drive        
-        if (currentPositionTicks <= firstQuarter) {  // in 1st 1/4
-          power = 0.3 + currentPositionTicks / firstQuarter * (maxPower-0.3);  // ramp from 0.3..maxPower as dist goes 0..0.25*totalDist
-        } else if (currentPositionTicks < lastQuarter) {  // between 1/4th & 3/4th
-          power = maxPower;
-        } else { // lastQuarter
-          power = maxPower - (currentPositionTicks - lastQuarter) / firstQuarter * (maxPower-0.3);  // ramp from maxPower..0.3 as dist goes 0.75*totalDist..totalDist
-        }
-        
-        /*
-        // Use fixed steps in power at 1/8, 1/4, 3/4 & 7/8 of total Dist
-        if (currentPositionTicks <= firstEighth) {  // in 1st 1/8th
-          power = 0.3;
-        } else if (currentPositionTicks < firstQuarter) {  // between 1/8th & 1/4th
-          power = 0.7;
-        } else if (currentPositionTicks < lastQuarter) {  // between 1/4th & 3/4th
-          power = maxPower;
-        } else if (currentPositionTicks < lastEighth) {  // between 3/4th & 7/8th
-          power = 0.7;
-        } else { // 7/8th to end
-          power = 0.3;
-        }
-        
-        
-        frontleft.setPower(power * frontLeftPower);
-        frontright.setPower(power * frontRightPower);
-        rearleft.setPower(power * rearLeftPower);
-        rearright.setPower(power * rearRightPower);
-        WhileLoopId = 2;
-      }
-    } 
-
-    /*
-    } else { //if (cw_ccw == 0.0) {  // LONG DRIVES W/O ROTATION
-      while (frontleft.isBusy()) {
-        currentPositionTicks = Math.abs(frontleft.getCurrentPosition());    // Only call .getCurrentPosition() once per cycle, instead of five
-        if (currentPositionTicks <= firstEighth || currentPositionTicks > lastEighth) {
-          power = 0.3;
-        } else if ((currentPositionTicks >= firstEighth && currentPositionTicks < firstQuarter) || currentPositionTicks > lastQuarter) {
-          power = 0.7;
-        } else if (maxPower == 0.9) {
-          power = 0.9;
-        }
-        frontleft.setPower(power * frontLeftPower);
-        frontright.setPower(power * frontRightPower);
-        rearleft.setPower(power * rearLeftPower);
-        rearright.setPower(power * rearRightPower);
-        WhileLoopId = 2;
-      }
-    } 
-    */
-
-    /*
-    else {
-      while (frontleft.isBusy()) {
-        currentPositionTicks = Math.abs(frontleft.getCurrentPosition());    // Only call .getCurrentPosition() once per cycle, instead of five
-        if (currentPositionTicks > lastEighth) {
-          power = 0.3;
-        } else if (maxPower == 0.7) {
-          if (currentPositionTicks > lastQuarter) {
-            power = 0.4;
-          } else if (currentPositionTicks > firstQuarter) {
-            power = maxPower;
-          }
-        } else if (currentPositionTicks > firstEighth) {
-          power = 0.4;
-        }
-        frontleft.setPower(power * frontLeftPower);
-        frontright.setPower(power * frontRightPower);
-        rearleft.setPower(power * rearLeftPower);
-        rearright.setPower(power * rearRightPower);
-        WhileLoopId = 3;
-      }
-    }
-    */
-    // Set motor power to zero
-    frontleft.setPower(0);
-    frontright.setPower(0);
-    rearleft.setPower(0);
-    rearright.setPower(0);
   }
   
-  /* setArmHeight()
-   *
-   * Raise the arm to a set height in inches by converting from ticks
-   */
-  public void setArmHeight(double height, double power) {
-    int raiseTargetTicks = (int) (height * 116.6);
-    armraise.setTargetPosition(raiseTargetTicks);
-    armraise.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-    armraise.setPower(power);
-    armraise.setPower(1);
-    while (armraise.isBusy()) {
-      sleep(10);
+  public void lowerArm() {
+    armrotate.setTargetPosition(0);
+    armraiseEx.setTargetPosition(0);
+    armraiseBEx.setTargetPosition(0);
+    armrotate.setPower(1);
+    armraiseEx.setPower(0.85);
+    armraiseBEx.setPower(0.85);
+    armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    armraiseEx.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+  }
+  
+  public void checkArmRes() {
+    if (magSwitch.isPressed()) {
+      armraiseEx.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
     }
   }
   
-  public void setArmHeightWait(double height, double power) {
-    int raiseTargetTicks = (int) (height * 116.6);
-    armraise.setTargetPosition(raiseTargetTicks);
-    armraise.setPower(power);
-    armraise.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-    while (armraise.isBusy()) {
-      sleep(10);
-    }
-  }
-
-  public void setArmAngle(double angle, double power) {
-      int rotateTargetTicks = (int) (angle * 4.55);
-      armrotate.setTargetPosition(rotateTargetTicks);
-      armrotate.setPower(power);
-      armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-  }
-
-  public void setArmAngleWait(double angle, double power) {
-      int rotateTargetTicks = (int) (angle * 4.55);
-      armrotate.setTargetPosition(rotateTargetTicks);
-      armrotate.setPower(power);
-      armrotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-      while (armrotate.isBusy()) {
-          sleep(10);
-      }
+  public void grabSpec() {
+    grabber.setPower(-1);
+    sleep(100);
   }
   
+  public void holdSpec() {
+    grabber.setPower(-0.03);
+  }
+  
+  public void dropSpec() {
+    grabber.setPower(0.5);
+    sleep(650);
+    grabber.setPower(0);
+  }
+  
+  public void extendArm() {
+    armextend.setPower(1);
+    sleep(500);
+    armextend.setPower(0);
+  }
+  
+  public int[] getArmPos() {
+    int[] ret = {armraiseEx.getCurrentPosition(), armrotate.getCurrentPosition()};
+    return ret;
+  }
+  
+  /*
   public void openGrabber() {
     grabber.setPosition(0.35);
   }
@@ -357,7 +310,7 @@ public class AutoCommon extends LinearOpMode {
   
   public boolean grabberOpen() {
     return grabber.getPosition() == 0.35;
-  }
+  }*/
   
   /* setArmExtend()
    * 
@@ -461,16 +414,19 @@ public class AutoCommon extends LinearOpMode {
     return detectedIds;
   }
     
-  double getImuYaw() { return imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES); }
-  public void resetArmEncoders() {
-    armraise.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    armrotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-  }
+  //double getImuYaw() { return imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES); }
   public void resetImuYaw() { imu.resetYaw(); }
   public void adjustEncoderTolerance(int newTolerance) {
     ((DcMotorEx) frontleft).setTargetPositionTolerance(newTolerance);
     ((DcMotorEx) frontright).setTargetPositionTolerance(newTolerance);
     ((DcMotorEx) rearleft).setTargetPositionTolerance(newTolerance);
     ((DcMotorEx) rearright).setTargetPositionTolerance(newTolerance);
+  }
+  public void closeAprilTag() {
+    visionPortal.close();
+  }
+  public void setArmRaiseTolerances(int newTol) {
+    armraiseEx.setTargetPositionTolerance(newTol);
+    armraiseBEx.setTargetPositionTolerance(newTol);
   }
 }
